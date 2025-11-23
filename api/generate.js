@@ -1,25 +1,26 @@
 import OpenAI from "openai";
-import express from "express";
-import cors from "cors";
-
-const app = express();
-
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-app.use(express.json());
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-app.post("/api/generate", async (req, res) => {
+export default async function handler(req, res) {
+  // ✅ CORS 처리 (서버리스용)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
     const { story } = req.body;
+
     if (!story) {
       return res.status(400).json({ error: "story 값이 필요합니다." });
     }
@@ -110,7 +111,7 @@ app.post("/api/generate", async (req, res) => {
       ],
     });
 
-    const raw = result.choices[0].message.content;
+    const raw = result.choices?.[0]?.message?.content;
     let data;
     try {
       data = JSON.parse(raw);
@@ -118,11 +119,9 @@ app.post("/api/generate", async (req, res) => {
       data = { error: "JSON 파싱 실패", raw };
     }
 
-    res.json(data);
+    return res.status(200).json(data);
   } catch (err) {
     console.error("🚨 서버 오류:", err);
-    res.status(500).json({ error: "서버 오류" });
+    return res.status(500).json({ error: "서버 오류", detail: err.message });
   }
-});
-
-export default app;
+}
